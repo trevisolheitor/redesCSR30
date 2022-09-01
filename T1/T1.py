@@ -10,7 +10,7 @@ from threading import Thread
 import os.path
 import mimetypes
 
-HOST, PORT = "localhost", 8004
+PORT = 8004
 CLRF = '/r/n'
 
 class BadRequest(Exception):
@@ -36,11 +36,10 @@ class HttpRequest(Thread):
             raise BadRequest    ('Incorrect Protocol')
             
         command, path, version = [i.strip() for i in temp[0].split()]
-        #headers = []
+        if path == '/':
+            path = '/index.html'
     
         if command == 'GET':
-         #   for j, k in [i.split(':', 1) for i in temp [1:-1]]:
-          #      headers[j.strip()] = k.strip()
                 file = path[1:]
                 if (os.path.exists(file)):
                     contentType = mimetypes.guess_type(file)[0]
@@ -56,37 +55,48 @@ class HttpRequest(Thread):
                 self.connSocket.send(statusLine.encode())
                 self.connSocket.send(contentLine.encode())
                 with open(file, "rb") as f:
-                    file_bytes = f.read(1024)
-                    
-                    while(file_bytes):
-                        self.connSocket.send(file_bytes)
-                        file_bytes = f.read(1024)
+                    self.connSocket.send(f.read())
                 
         else:
             raise BadRequest('Not a GET request')
     
         self.connSocket.close()
     
-                
+def get_ip():
+	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+	s.settimeout(0)
+	try:
+		s.connect(('10.254.254', 1))
+		IP = s.getsockname()[0]
+	except Exception:
+		IP = '127.0.0.1'
+	finally:
+		s.close()
+	return IP
     
 def main():
     sSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sSocket.bind((HOST, PORT))
+    #For Linux usage run the line below
+    sSocket.bind((get_ip(), PORT))
+    
+    #For Windows usage run this other line below
+    #sSocket.bind((socket.gethostbyname(socket.gethostname()), PORT))
+    serveraddr = sSocket.getsockname()
     sSocket.listen(10)
-    print("Server" +  HOST  + " is up and ready to receive")
+    print("Server ", serveraddr[0], " on port ", serveraddr[1], " is up and ready to receive")
 
-
-    while(True):
-        connSocket, addr = sSocket.accept()
+    try:
+        while(True):
+            connSocket, addr = sSocket.accept()
+               
+            request = HttpRequest(connSocket)
         
-        #print(connSocket.recv(1024).decode())
+            request.start()
         
-        request = HttpRequest(connSocket)
-        
-        request.start()
-        
-        request.join()
-        
+            request.join()
+    except (KeyboardInterrupt):
+        sSocket.close()
+		
     sSocket.close()
       
                 
