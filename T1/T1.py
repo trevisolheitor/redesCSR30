@@ -62,11 +62,14 @@ class HttpRequest(Thread):
     
         self.connSocket.close()
     
+#Função que retorna o IP da máquina, utilizado para criação do WebServer
+#Código feito baseado no artigo sobre retorno de endereço IP com python do site DelftStack, disponível em: https://www.delftstack.com/howto/python/get-ip-address-python/
+	
 def get_ip():
 	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	s.settimeout(0)
 	try:
-		s.connect(('10.254.254', 1))
+		s.connect(('8.8.8.8', 1))
 		IP = s.getsockname()[0]
 	except Exception:
 		IP = '127.0.0.1'
