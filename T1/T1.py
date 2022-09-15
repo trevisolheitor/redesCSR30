@@ -11,7 +11,7 @@ import os.path
 import mimetypes
 
 PORT = 8004
-CLRF = '/r/n'
+CLRF = '\r\n'
 
 class BadRequest(Exception):
     pass
@@ -54,6 +54,7 @@ class HttpRequest(Thread):
 
                 self.connSocket.send(statusLine.encode())
                 self.connSocket.send(contentLine.encode())
+		self.connSocket.send(CLRF)
                 with open(file, "rb") as f:
                     self.connSocket.send(f.read())
                 
