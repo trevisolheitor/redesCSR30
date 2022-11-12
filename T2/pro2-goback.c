@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 /* ******************************************************************
  ALTERNATING BIT AND GO-BACK-N NETWORK EMULATOR: VERSION 1.1  J.F.Kurose
@@ -34,61 +36,161 @@ struct pkt {
    char payload[20];
     };
 
+void starttimer(int AorB, float increment);
+void stoptimer(int AorB);
+void tolayer3(int AorB, struct pkt packet);
+void tolayer5(int AorB, char datasent[20]);
+
 /********* STUDENTS WRITE THE NEXT SEVEN ROUTINES *********/
 
+#define RTT 10.0
+
+#define BUFFERWINDOW 50
+
+int Aseq, Bseq, window_size, window_init, buffer_ctrl;
+
+struct pkt packet_buffer[BUFFERWINDOW];
 
 
-
-/* called from layer 5, passed the data to be sent to other side */
-A_output(message)
-  struct msg message;
+int cal_checksum(struct pkt *packet)
 {
-
+	int aux = 0;
+	aux = aux + packet->seqnum;
+	aux = aux + packet->acknum;
+	for(int i = 0; i < strlen(packet->payload); i++)
+		aux = aux + packet->payload[i];
+	
+	return aux;
 }
 
-B_output(message)  /* need be completed only for extra credit */
-  struct msg message;
+void send()
+{
+	while(Aseq < buffer_ctrl && Aseq < window_init + window_size)
+	{		
+		printf(" A: Pacote (%d): %s enviado. \n", packet_buffer[buffer_ctrl % BUFFERWINDOW].seqnum, packet_buffer[buffer_ctrl % BUFFERWINDOW].payload);
+		tolayer3(0, packet_buffer[buffer_ctrl % BUFFERWINDOW]);		
+		Aseq++;
+	}	
+	starttimer(0, RTT);
+}
+
+/* called from layer 5, passed the data to be sent to other side */
+void A_output(struct msg message)
 {
 
+	if(buffer_ctrl - window_init >= BUFFERWINDOW) //If packet in transit, drop message
+	{
+		printf(" A: Buffer cheio, mensagem: %s  ignorada (droped) \n", message.data);
+		return;
+	}
+	printf("  A: pacote em buffer(%d): %s\n", buffer_ctrl ,message.data);
+	struct pkt *packet = &packet_buffer[buffer_ctrl % BUFFERWINDOW];
+	packet->seqnum = buffer_ctrl;
+	strcpy (packet->payload, message.data);
+	packet->checksum = cal_checksum(packet);
+	buffer_ctrl++;	
+	send();
+}
+
+void B_output(struct msg message)  /* need be completed only for extra credit */
+{
+	return;
 }
 
 /* called from layer 3, when a packet arrives for layer 4 */
-A_input(packet)
-  struct pkt packet;
+void A_input(struct pkt packet)  
 {
-
+	if (packet.checksum != cal_checksum(&packet))
+	{
+		printf(" A: ACK corrompido. \n");
+		return;
+	}
+	if (packet.acknum < 1)
+	{
+		printf(" A: NACK recebido. \n");
+		return;
+	}
+	printf(" A: ACK recebido (%d). \n", packet.acknum);
+	window_init = packet.acknum + 1;
+	if (window_init != Aseq)
+	{
+		starttimer(0, RTT);
+		return;
+	}
+	else
+		stoptimer(0);
+	
+	send();
 }
 
 /* called when A's timer goes off */
-A_timerinterrupt()
+void A_timerinterrupt()
 {
-
+	for (int i = window_init; i < Aseq; i++)
+	{
+		printf(" A: Interrupcao por tempo, reenviando pacote(%d)\n", packet_buffer[i % BUFFERWINDOW].seqnum);
+		tolayer3(0, packet_buffer[i % BUFFERWINDOW]);
+	}
+	starttimer(0, RTT);
 }  
 
 /* the following routine will be called once (only) before any other */
 /* entity A routines are called. You can use it to do any initialization */
-A_init()
+void A_init()
 {
+	window_size = 8;
+	Aseq = 1;
+	window_init = 1;
+	buffer_ctrl = 1;
 }
 
+void ack(int AorB, int ack)
+{
+	struct pkt packet;
+	packet.acknum = ack;
+	packet.checksum = cal_checksum(&packet);
+	tolayer3(AorB, packet);
+}
 
 /* Note that with simplex transfer from a-to-B, there is no B_output() */
 
 /* called from layer 3, when a packet arrives for layer 4 at B*/
-B_input(packet)
-  struct pkt packet;
+void B_input(struct pkt packet)  
 {
+	if (packet.checksum != cal_checksum(&packet))
+	{
+		printf(" B: Pacote recebido corrompido. NACK\n");
+		ack(1, -Bseq);
+		return;
+	}
+	if (packet.seqnum != Bseq)
+	{
+		printf(" B: numero de seq inesperado. NACK\n");
+		ack(1, -Bseq);
+		return;
+	}
+	
+	printf(" B: Mensagem(%d): %s recebida.  ACK \n", packet.seqnum, packet.payload);
+	tolayer5(1, packet.payload);
+	
+	printf(" B: ACK(%d) enviado. \n", Bseq);
+	ack(1, Bseq);
+	Bseq++;
+	
+	
 }
 
 /* called when B's timer goes off */
-B_timerinterrupt()
+void B_timerinterrupt()
 {
+	return;
 }
 
 /* the following rouytine will be called once (only) before any other */
 /* entity B routines are called. You can use it to do any initialization */
-B_init()
+void B_init()
 {
+	Bseq = 1;
 }
 
 
@@ -141,7 +243,11 @@ int   ntolayer3;           /* number sent into layer 3 */
 int   nlost;               /* number lost in media */
 int ncorrupt;              /* number corrupted by media*/
 
-main()
+void init();
+void generate_next_arrival();
+void insertevent(struct event *p);
+
+int main()
 {
    struct event *eventptr;
    struct msg  msg2give;
@@ -181,6 +287,7 @@ main()
             j = nsim % 26; 
             for (i=0; i<20; i++)  
                msg2give.data[i] = 97 + j;
+		    msg2give.data[19] = 0;
             if (TRACE>2) {
                printf("          MAINLOOP: data given to student: ");
                  for (i=0; i<20; i++) 
@@ -222,8 +329,7 @@ terminate:
 }
 
 
-
-init()                         /* initialize the simulator */
+void init()                         /* initialize the simulator */
 {
   int i;
   float sum, avg;
@@ -251,7 +357,7 @@ init()                         /* initialize the simulator */
     printf("It is likely that random number generation on your machine\n" ); 
     printf("is different from what this emulator expects.  Please take\n");
     printf("a look at the routine jimsrand() in the emulator code. Sorry. \n");
-    exit();
+    exit(0);
     }
 
    ntolayer3 = 0;
@@ -279,11 +385,10 @@ float jimsrand()
 /*  The next set of routines handle the event list   */
 /*****************************************************/
  
-generate_next_arrival()
+void generate_next_arrival()
 {
    double x,log(),ceil();
    struct event *evptr;
-    char *malloc();
    float ttime;
    int tempint;
 
@@ -303,8 +408,7 @@ generate_next_arrival()
 } 
 
 
-insertevent(p)
-   struct event *p;
+void insertevent(struct event *p)   
 {
    struct event *q,*qold;
 
@@ -341,7 +445,7 @@ insertevent(p)
          }
 }
 
-printevlist()
+void printevlist()
 {
   struct event *q;
   int i;
@@ -357,8 +461,7 @@ printevlist()
 /********************** Student-callable ROUTINES ***********************/
 
 /* called by students routine to cancel a previously-started timer */
-stoptimer(AorB)
-int AorB;  /* A or B is trying to stop timer */
+void stoptimer(int AorB)
 {
  struct event *q,*qold;
 
@@ -387,14 +490,11 @@ int AorB;  /* A or B is trying to stop timer */
 }
 
 
-starttimer(AorB,increment)
-int AorB;  /* A or B is trying to stop timer */
-float increment;
+void starttimer(int AorB,float increment)
 {
 
  struct event *q;
  struct event *evptr;
- char *malloc();
 
  if (TRACE>2)
     printf("          START TIMER: starting timer at %f\n",time);
@@ -416,13 +516,10 @@ float increment;
 
 
 /************************** TOLAYER3 ***************/
-tolayer3(AorB,packet)
-int AorB;  /* A or B is trying to stop timer */
-struct pkt packet;
+void tolayer3(int AorB, struct pkt packet)
 {
  struct pkt *mypktptr;
  struct event *evptr,*q;
- char *malloc();
  float lastime, x, jimsrand();
  int i;
 
@@ -489,9 +586,7 @@ struct pkt packet;
   insertevent(evptr);
 } 
 
-tolayer5(AorB,datasent)
-  int AorB;
-  char datasent[20];
+void tolayer5(int AorB, char datasent[20])
 {
   int i;  
   if (TRACE>2) {

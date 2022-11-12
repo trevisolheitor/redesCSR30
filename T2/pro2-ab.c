@@ -43,6 +43,8 @@ void tolayer5(int AorB, char datasent[20]);
 
 /********* STUDENTS WRITE THE NEXT SEVEN ROUTINES *********/
 
+#define RTT 10.0;
+
 int Aseq, Bseq, busy;
 
 struct pkt lst_packet;
@@ -77,7 +79,7 @@ void A_output(struct msg message)
 	lst_packet = packet;
 
 	tolayer3(0, packet);
-	starttimer(0, 10.0);
+	starttimer(0, RTT);
 
 }
 
@@ -111,7 +113,7 @@ void A_timerinterrupt()
 {
 	printf(" A: Interrupcao por tempo, reenviando ultimo pacote\n");
 	tolayer3(0, lst_packet);
-	starttimer(0, 10.0);
+	starttimer(0, RTT);
 }  
 
 /* the following routine will be called once (only) before any other */
