@@ -43,11 +43,11 @@ void tolayer5(int AorB, char datasent[20]);
 
 /********* STUDENTS WRITE THE NEXT SEVEN ROUTINES *********/
 
-#define RTT 10.0
+#define RTT 20.0
 
 #define BUFFERWINDOW 50
 
-int Aseq, Bseq, window_size, window_init, buffer_ctrl;
+int Aseq, Bseq, B_ack, window_size, window_init, buffer_ctrl;
 
 struct pkt packet_buffer[BUFFERWINDOW];
 
@@ -65,20 +65,23 @@ int cal_checksum(struct pkt *packet)
 
 void send()
 {
+    int aux = 0;
 	while(Aseq < buffer_ctrl && Aseq < window_init + window_size)
-	{		
-		printf(" A: Pacote (%d): %s enviado. \n", packet_buffer[buffer_ctrl % BUFFERWINDOW].seqnum, packet_buffer[buffer_ctrl % BUFFERWINDOW].payload);
-		tolayer3(0, packet_buffer[buffer_ctrl % BUFFERWINDOW]);		
+	{	
+		printf(" A: Pacote (%d): %s enviado. \n", packet_buffer[Aseq % BUFFERWINDOW].seqnum, packet_buffer[Aseq % BUFFERWINDOW].payload);
+		tolayer3(0, packet_buffer[Aseq % BUFFERWINDOW]);		
 		Aseq++;
-	}	
-	starttimer(0, RTT);
+        aux = 1;
+	}
+    if (aux == 1)	
+    	starttimer(0, RTT);
 }
 
 /* called from layer 5, passed the data to be sent to other side */
 void A_output(struct msg message)
 {
 
-	if(buffer_ctrl - window_init >= BUFFERWINDOW) //If packet in transit, drop message
+	if(buffer_ctrl - window_init >= BUFFERWINDOW) //Se tiver pacote em transito, dropa mensagem
 	{
 		printf(" A: Buffer cheio, mensagem: %s  ignorada (droped) \n", message.data);
 		return;
@@ -88,6 +91,7 @@ void A_output(struct msg message)
 	packet->seqnum = buffer_ctrl;
 	strcpy (packet->payload, message.data);
 	packet->checksum = cal_checksum(packet);
+
 	buffer_ctrl++;	
 	send();
 }
@@ -118,9 +122,13 @@ void A_input(struct pkt packet)
 		return;
 	}
 	else
+    {
 		stoptimer(0);
+        printf(" A: Timer stopped \n");
+    	send();
+    }
 	
-	send();
+
 }
 
 /* called when A's timer goes off */
@@ -138,7 +146,7 @@ void A_timerinterrupt()
 /* entity A routines are called. You can use it to do any initialization */
 void A_init()
 {
-	window_size = 8;
+	window_size = 12;
 	Aseq = 1;
 	window_init = 1;
 	buffer_ctrl = 1;
@@ -165,16 +173,17 @@ void B_input(struct pkt packet)
 	}
 	if (packet.seqnum != Bseq)
 	{
-		printf(" B: numero de seq inesperado. NACK\n");
-		ack(1, -Bseq);
+		printf(" B: numero de seq inesperado. Reenviando úlimo ACK (%d)\n", B_ack);
+		ack(1, B_ack);
 		return;
 	}
 	
 	printf(" B: Mensagem(%d): %s recebida.  ACK \n", packet.seqnum, packet.payload);
 	tolayer5(1, packet.payload);
 	
-	printf(" B: ACK(%d) enviado. \n", Bseq);
-	ack(1, Bseq);
+    B_ack = Bseq;
+	printf(" B: ACK(%d) enviado. \n", B_ack);    
+	ack(1, B_ack);
 	Bseq++;
 	
 	
@@ -191,6 +200,7 @@ void B_timerinterrupt()
 void B_init()
 {
 	Bseq = 1;
+    B_ack = 1;
 }
 
 

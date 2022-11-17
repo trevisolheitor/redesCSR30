@@ -43,7 +43,7 @@ void tolayer5(int AorB, char datasent[20]);
 
 /********* STUDENTS WRITE THE NEXT SEVEN ROUTINES *********/
 
-#define RTT 10.0;
+#define RTT 20.0
 
 int Aseq, Bseq, busy;
 
