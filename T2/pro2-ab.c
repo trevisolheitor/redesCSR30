@@ -45,17 +45,25 @@ void tolayer5(int AorB, char datasent[20]);
 
 #define RTT 20.0
 
+/*  Inicialização das estruturas de dados usadas no controle do transferência de pacotes
+	Aseq = N. de sequência de A
+	Bseq = N. de sequência de B
+	busy = flag de situação do canal de transporte 0 = limpo 1 = ocupado
+*/
+
 int Aseq, Bseq, busy;
 
 struct pkt lst_packet;
 
+
+// Função para realizar o cálculo de checksum de um pacote, recebe o pacote como entrada e retorna o valor cálculado do checksum
 
 int cal_checksum(struct pkt *packet)
 {
 	int aux = 0;
 	aux = aux + packet->seqnum;
 	aux = aux + packet->acknum;
-	for(int i = 0; i < strlen(packet->payload); i++)
+	for(int i = 0; i < strlen(packet->payload); i++)  // Soma o valor em ASCII dos caracteres no payload for de 0 até o tamanho do payload para passar por todos caracteres
 		aux = aux + packet->payload[i];
 	
 	return aux;
@@ -65,18 +73,18 @@ int cal_checksum(struct pkt *packet)
 void A_output(struct msg message)
 {
 
-	if(busy) //If packet in transit, drop message
+	if(busy) // Se tiver algum pacote em trânsito, dropa a mensagem
 	{
 		printf(" A: Pacote em trânsito, mensagem: %s  ignorada (droped) \n", message.data);
 		return;
 	}
 	printf("  A: enviando pacote: %s\n", message.data);
-	struct pkt packet;
-	packet.seqnum = Aseq;
+	struct pkt packet;   		// Criação de um pacote temporário para o envio dos dados
+	packet.seqnum = Aseq;		// Seqnum do pacote = ao número de sequência de A
 	strcpy (packet.payload, message.data);
 	packet.checksum = cal_checksum(&packet);
-	busy = 1;
-	lst_packet = packet;
+	busy = 1;					// Atualiza a flag busy para identificar pacote em trânsito
+	lst_packet = packet;		// Gera uma cópia do pacote para o caso de necessidade de reenvio
 
 	tolayer3(0, packet);
 	starttimer(0, RTT);
@@ -103,8 +111,8 @@ void A_input(struct pkt packet)
 	}
 	printf(" A: ACK recebido. \n");
 	stoptimer(0);
-	Aseq ^= 1;
-	busy = 0;
+	Aseq ^= 1;				// XOR do valor de sequência de A para funcionar alternadamente
+	busy = 0;				// Limpa flag de busy, não há mais pacotes em trânsito
 	
 }
 
@@ -123,6 +131,8 @@ void A_init()
 	busy = 0;
 	Aseq = 0;
 }
+
+// Função para gerar o envio de um ACK/NACK recebe identificar AorB para definir qual hospedeiro, e um valor inteiro ack como valor do ack
 
 void ack(int AorB, int ack)
 {
@@ -152,7 +162,7 @@ void B_input(struct pkt packet)
 	
 	printf(" B: Mensagem %s recebida.  ACK \n", packet.payload);
 	tolayer5(1, packet.payload);
-	Bseq ^= 1;
+	Bseq ^= 1;  			// XOR do valor de sequência de B para funcionar alternadamente
 	ack(1, Bseq);
 	
 }

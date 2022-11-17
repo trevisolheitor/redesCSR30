@@ -47,21 +47,34 @@ void tolayer5(int AorB, char datasent[20]);
 
 #define BUFFERWINDOW 50
 
+/* Inicialização das estruturas de dados usadas no controle do transferência de pacotes
+	Aseq = N. de sequência de A
+	Bseq = N. de sequência de B
+	B_ack = N. do último ack de B (para casos de receber pacotes já registrados)
+	window_size = tamanho da janela do Goback N
+	window_init = valor inicial da janela para acompanhamento do controlador de buffer
+	buffer_ctrl = controlador de buffer valor aumenta a cada pacote enviado
+	packet_buffer = Buffer de pacotes para caso mais de um pacote seja endereçado de uma vez
+*/
+
 int Aseq, Bseq, B_ack, window_size, window_init, buffer_ctrl;
 
 struct pkt packet_buffer[BUFFERWINDOW];
 
+// Função para realizar o cálculo de checksum de um pacote, recebe o pacote como entrada e retorna o valor cálculado do checksum
 
 int cal_checksum(struct pkt *packet)
 {
 	int aux = 0;
 	aux = aux + packet->seqnum;
 	aux = aux + packet->acknum;
-	for(int i = 0; i < strlen(packet->payload); i++)
+	for(int i = 0; i < strlen(packet->payload); i++)	// Soma o valor em ASCII dos caracteres no payload for de 0 até o tamanho do payload para passar por todos caracteres
 		aux = aux + packet->payload[i];
 	
 	return aux;
 }
+
+// Função para realizar o envio de todos pacotes no buffer variável aux tem o objetivo de proteger o ínicio do timer em casos de entrada na função sem pacotes a serem enviados
 
 void send()
 {
@@ -81,7 +94,7 @@ void send()
 void A_output(struct msg message)
 {
 
-	if(buffer_ctrl - window_init >= BUFFERWINDOW) //Se tiver pacote em transito, dropa mensagem
+	if(buffer_ctrl - window_init >= BUFFERWINDOW) //Se o buffer de pacotes estiver cheio, dropa a mensagem
 	{
 		printf(" A: Buffer cheio, mensagem: %s  ignorada (droped) \n", message.data);
 		return;
@@ -116,7 +129,7 @@ void A_input(struct pkt packet)
 	}
 	printf(" A: ACK recebido (%d). \n", packet.acknum);
 	window_init = packet.acknum + 1;
-	if (window_init != Aseq)
+	if (window_init != Aseq) // Comparação para o caso de chegada a função sem todos pacotes terem sido enviados
 	{
 		starttimer(0, RTT);
 		return;
@@ -134,7 +147,7 @@ void A_input(struct pkt packet)
 /* called when A's timer goes off */
 void A_timerinterrupt()
 {
-	for (int i = window_init; i < Aseq; i++)
+	for (int i = window_init; i < Aseq; i++)  //Em caso de estouro de timer reenvia todos pacotes em buffer
 	{
 		printf(" A: Interrupcao por tempo, reenviando pacote(%d)\n", packet_buffer[i % BUFFERWINDOW].seqnum);
 		tolayer3(0, packet_buffer[i % BUFFERWINDOW]);
@@ -152,6 +165,8 @@ void A_init()
 	buffer_ctrl = 1;
 }
 
+// Função para gerar o envio de um ACK/NACK recebe identificar AorB para definir qual hospedeiro, e um valor inteiro ack como valor do ack
+
 void ack(int AorB, int ack)
 {
 	struct pkt packet;
@@ -168,20 +183,20 @@ void B_input(struct pkt packet)
 	if (packet.checksum != cal_checksum(&packet))
 	{
 		printf(" B: Pacote recebido corrompido. NACK\n");
-		ack(1, -Bseq);
+		ack(1, -Bseq);			// Em caso de envio de NACK é enviado o valor negativo da sequência de B
 		return;
 	}
 	if (packet.seqnum != Bseq)
 	{
 		printf(" B: numero de seq inesperado. Reenviando úlimo ACK (%d)\n", B_ack);
-		ack(1, B_ack);
+		ack(1, B_ack);			// Caso de pacote recebido mas já registrado, reenvia o ACK do último pacote registrado
 		return;
 	}
 	
 	printf(" B: Mensagem(%d): %s recebida.  ACK \n", packet.seqnum, packet.payload);
 	tolayer5(1, packet.payload);
 	
-    B_ack = Bseq;
+    B_ack = Bseq;				// Atualiza o último ACK de B
 	printf(" B: ACK(%d) enviado. \n", B_ack);    
 	ack(1, B_ack);
 	Bseq++;
