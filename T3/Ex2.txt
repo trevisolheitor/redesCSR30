@@ -1,0 +1,118 @@
+Lista de comandos e operações realizadas no exercício 1:
+
+
+Inicialização do ambiente:
+
+Adicionar 4 elementos do tipo End-Devices PC-PT
+Adicionar 1 elemento do tipo Switch 2950-24
+Adicionar 1 elemento do tipo Router Router-PT
+
+Conectar os elementos usando conexão "Copper Straight-Through" entre os PC-PT e o Switch usando a porta FastEthernet0 e conectando na ordem:
+
+PC 	  Switch
+
+PC0 > FastEthernet0/1
+PC1 > FastEthernet0/2
+PC2 > FastEthernet0/3
+PC3 > FastEthernet0/4
+
+Conectar o Switch e o Router pelas portas:
+
+Switch   		   Router
+
+FastEthernet0/24 > FastEthernet0/0
+
+
+
+Atribuir valores de IP para os PCs:
+
+PC0 : 192.168.0.2
+PC1 : 192.168.0.3
+
+PC2 : 192.100.10.2
+PC3 : 192.100.10.3
+
+Programação do Switch:
+
+Entrando em CLI do Switch para criar a VLAN 2 e atribuir as portas 3 e 4 a estas nova VLAN foram usados os seguintes comandos:
+
+> ENA							-- Entra no modo administrativo
+
+# Configure Terminal			-- Entra no modo de configuração
+# VLAN 10						-- Cria VLAN 10
+# NAME PROF						-- Nomeia PROF (Professores)
+# END							-- Termina operação
+# Configure Terminal			-- Entra no modo de configuração
+# VLAN 20						-- Cria VLAN 20
+# NAME ALU						-- Nomeia ALU (Alunos)
+# END							-- Termina operação
+#
+# Configure Terminal			-- Entra no modo de configuração
+# INT F0/1						-- Seleciona Interface F0/1 (Porta 1 do switch)
+# Switchport Access VLAN 10		-- Atribui a porta a VLAN 10
+# INT F0/2						-- Seleciona Interface F0/2 (Porta 2 do switch)
+# Switchport Access VLAN 10		-- Atribui a porta a VLAN 10
+# INT F0/3						-- Seleciona Interface F0/3 (Porta 3 do switch)
+# Switchport Access VLAN 20		-- Atribui a porta a VLAN 20
+# INT F0/4						-- Seleciona Interface F0/4 (Porta 4 do switch)
+# Switchport Access VLAN 20		-- Atribui a porta a VLAN 20
+#
+# INT F0/24						-- Seleciona Interface F0/24 (Porta 24 do switch)
+# Switchport mode trunk			-- Configura mode trunk para porta para ser usada como conexão ao roteador
+# ^z							-- CTRL+Z para retornar ao início da operação
+#
+# Show VLAN Brief				-- Para observar a configuração e confirmar se tudo foi feito corretamente
+# WR							-- Escrita do que foi programado para uso real
+#
+
+Agora para configuração do Router:
+
+> ENA
+
+# Configure Terminal
+# Interface FastEthernet 0/0.1
+# Encapsulation dot1Q 10
+# IP Address 192.168.0.1 255.255.255.0
+# exit
+#
+# Interface FastEthernet 0/0.2
+# Encapsulation dot1Q 20
+# IP Address 192.100.10.1 255.255.255.0
+# exit
+#
+# Interface FastEthernet 0/0
+# no Shutdown
+#
+# ^z
+#
+# Configure Terminal
+# ip route 192.100.10.0 255.255.255.0 FastEthernet 0/0.2 1
+# ip route 192.168.0.0 255.255.255.0 FastEthernet 0/0.1 1
+#
+
+Agora com Switch e Router configurados fazer testes de "ping":
+
+PC0 > PC2   -- Sucesso
+PC0 > PC1   -- Sucesso
+PC0 > PC3   -- Sucesso
+PC3 > PC1   -- Sucesso
+
+É possível observar pelo menu Simulation o processo de ARP e ICMP funcionando de maneira ilustrativa.
+
+
+Agora para reverter a configuração e todos voltarem a VLAN1:
+
+# Configure Terminal
+# INT F0/1
+# Switchport Access VLAN 1		-- Retornando as portas 1, 2, 3 e 4 para VLAN 1 e escrevendo para uso
+# INT F0/2
+# Switchport Access VLAN 1
+# INT F0/3
+# Switchport Access VLAN 1	
+# INT F0/4
+# Switchport Access VLAN 1
+# ^z
+#
+# WR
+#
+

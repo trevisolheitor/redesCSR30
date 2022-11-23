@@ -1,0 +1,70 @@
+Lista de comandos e operações realizadas no exercício 1:
+
+
+Inicialização do ambiente:
+
+Adicionar 4 elementos do tipo End-Devices PC-PT
+Adicionar 1 elemento do tipo Switch 2950-24
+
+Conectar os elementos usando conexão "Copper Straight-Through" entre os PC-PT e o Switch usando a porta FastEthernet0 e conectando na ordem:
+
+PC 	  Switch
+
+PC0 > FastEthernet0/1
+PC1 > FastEthernet0/2
+PC2 > FastEthernet0/3
+PC3 > FastEthernet0/4
+
+
+Atribuir valores de IP para os PCs, usando 10.0.0.1 -> 10.0.0.4
+
+Testar com "pings" (Add Simple PDU) as conexões entre PCs
+
+Sucesso observado em todos testes.
+
+Programação do Switch:
+
+Entrando em CLI do Switch para criar a VLAN 2 e atribuir as portas 3 e 4 a estas nova VLAN foram usados os seguintes comandos:
+
+> ENA							-- Entra no modo administrativo
+
+# Configure Terminal			-- Entra no modo de configuração
+# VLAN 2						-- Cria VLAN 2
+# NAME ALU						-- Nomeia ALU (Alunos)
+# END							-- Termina operação
+#
+# Configure Terminal			-- Entra no modo de configuração
+# INT F0/3						-- Seleciona Interface F0/3 (Porta 3 do switch)
+# Switchport Access VLAN 2		-- Atribui a porta a VLAN 2
+# INT F0/4						-- Seleciona Interface F0/4 (Porta 4 do switch)
+# Switchport Access VLAN 2		-- Atribui a porta a VLAN 2
+# ^z							-- CTRL+Z para retornar ao início da operação
+#
+# Show VLAN Brief				-- Para observar a configuração e confirmar se tudo foi feito corretamente
+# WR							-- Escrita do que foi programado para uso real
+#
+
+Agora com VLAN 2 configurada fazer testes de "ping":
+
+PC3 > PC2   -- Sucesso
+PC0 > PC1   -- Sucesso
+PC1 > PC2   -- Falha
+
+Como esperado falha na tentativa de comunicar entre as VLANs, mas funcional dentro da própria VLAN.
+
+Agora para reverter a configuração e todos voltarem a VLAN1:
+
+# Configure Terminal
+# INT F0/3
+# Switchport Access VLAN 1		-- Retornando as portas 3 e 4 para VLAN 1 e escrevendo para uso
+# INT F0/4
+# Switchport Access VLAN 1
+# ^z
+#
+# WR
+#
+
+Testes finais:
+
+PC2 > PC3   -- Sucesso
+PC2 > PC0   -- Sucesso
