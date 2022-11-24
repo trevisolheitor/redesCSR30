@@ -1,4 +1,4 @@
-Lista de comandos e operações realizadas no exercício 1:
+Lista de comandos e operações realizadas no exercício 2:
 
 
 Inicialização do ambiente:
